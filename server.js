@@ -1,46 +1,52 @@
 const express = require('express');
 const app = express();
-const port = process.env.PORT || 3000;
+const bodyParser = require('body-parser');
+const cors = require('cors');
+const fs = require('fs');
+const port = process.env.PORT || 5000;
 
-// Wir simulieren eine Datenbank mit einem einfachen Array für das Leaderboard
-let leaderboard = [
-    { name: 'Alice', score: 100 },
-    { name: 'Bob', score: 80 },
-    { name: 'Charlie', score: 60 }
-];
+// Mittelware
+app.use(bodyParser.json());
+app.use(cors());
 
-// Middleware für JSON-Parsing
-app.use(express.json());
+// In-Memory-Datenbank für Leaderboard (kann später in eine echte DB umgewandelt werden)
+let leaderboard = [];
 
-// Statische Dateien bereitstellen (HTML, CSS, JS)
-app.use(express.static('public'));
+// Lade bestehende Bestenliste (wenn vorhanden)
+const loadLeaderboard = () => {
+    if (fs.existsSync('leaderboard.json')) {
+        const data = fs.readFileSync('leaderboard.json', 'utf8');
+        leaderboard = JSON.parse(data);
+    }
+};
 
-// Endpunkt zum Abrufen des Leaderboards
+// Speichere die Bestenliste
+const saveLeaderboard = () => {
+    fs.writeFileSync('leaderboard.json', JSON.stringify(leaderboard, null, 2), 'utf8');
+};
+
+// Bestenliste abrufen
 app.get('/leaderboard', (req, res) => {
-    res.json(leaderboard);
+    loadLeaderboard();
+    leaderboard.sort((a, b) => b.score - a.score); // Sortiere die Liste nach Punktzahl
+    res.json(leaderboard.slice(0, 10)); // Gebe nur die Top 10 zurück
 });
 
-// Endpunkt zum Hinzufügen eines neuen Scores
-app.post('/submit', (req, res) => {
+// Punktzahl des Spielers senden
+app.post('/submitScore', (req, res) => {
     const { name, score } = req.body;
+    loadLeaderboard();
 
-    if (!name || !score) {
-        return res.status(400).send('Name und Score sind erforderlich.');
-    }
-
-    // Füge den neuen Score zum Leaderboard hinzu
+    // Füge den neuen Spieler hinzu
     leaderboard.push({ name, score });
 
-    // Sortiere das Leaderboard nach Punktzahl in absteigender Reihenfolge
-    leaderboard.sort((a, b) => b.score - a.score);
+    // Speichern der aktualisierten Bestenliste
+    saveLeaderboard();
 
-    // Beschränke das Leaderboard auf die besten 10 Einträge
-    leaderboard = leaderboard.slice(0, 10);
-
-    res.status(200).send('Score erfolgreich hinzugefügt');
+    res.json({ success: true });
 });
 
-// Starte den Server
+// Server starten
 app.listen(port, () => {
     console.log(`Server läuft auf Port ${port}`);
 });
