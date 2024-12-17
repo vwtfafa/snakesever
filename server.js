@@ -1,68 +1,59 @@
 const express = require('express');
-const fs = require('fs');
+const bodyParser = require('body-parser');
 const app = express();
 const port = 3000;
 
-let leaderboard = [];
+let leaderboard = [
+    { name: "Max", score: 150 },
+    { name: "Anna", score: 130 },
+    { name: "Lucas", score: 120 },
+    { name: "John", score: 110 },
+    { name: "Sarah", score: 100 },
+    { name: "Tom", score: 90 },
+    { name: "Kate", score: 80 },
+    { name: "Chris", score: 70 },
+    { name: "Lena", score: 60 },
+    { name: "Paul", score: 50 }
+];
 
-// Middleware für JSON-Verarbeitung
-app.use(express.json());
+// Middleware
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
-// Route, um einen neuen Punktestand zu speichern
-app.post('/submit', (req, res) => {
-    const { name, score } = req.body;
-    
-    // Füge den neuen Punktestand hinzu
-    leaderboard.push({ name, score });
-
-    // Sortiere die Bestenliste nach Punkten (absteigend) und behalte nur die besten 10
-    leaderboard.sort((a, b) => b.score - a.score);
-    leaderboard = leaderboard.slice(0, 10);
-
-    // Speichern der Bestenliste
-    fs.writeFileSync('leaderboard.json', JSON.stringify(leaderboard));
-
-    res.json({ message: 'Score submitted successfully!' });
-});
-
-// Route, um die Bestenliste abzurufen
+// API-Endpunkt zum Abrufen des Leaderboards
 app.get('/leaderboard', (req, res) => {
-    // Lade die Bestenliste aus der Datei
-    try {
-        const data = fs.readFileSync('leaderboard.json', 'utf8');
-        leaderboard = JSON.parse(data);
-    } catch (err) {
-        leaderboard = [];
-    }
+    // Wir senden nur die besten 10 Spieler
     res.json(leaderboard);
 });
 
-// Route für Admin-Seite (Verwaltung der Bestenliste)
-app.get('/admin', (req, res) => {
-    res.sendFile(__dirname + '/admin.html');
-});
+// API-Endpunkt zum Hinzufügen einer Punktzahl
+app.post('/admin/leaderboard', (req, res) => {
+    const { password, action, name, score } = req.body;
+    const adminPassword = "admin123"; // Beispiel für Admin-Passwort
 
-// Admin-Daten löschen oder bearbeiten (nur für Admin)
-app.post('/admin/edit', (req, res) => {
-    const { action, index } = req.body;
-
-    if (action === 'delete') {
-        leaderboard.splice(index, 1);
+    // Authentifizierung des Admins
+    if (password !== adminPassword) {
+        return res.status(401).json({ success: false, message: 'Falsches Passwort!' });
     }
 
-    // Speichern nach Änderungen
-    fs.writeFileSync('leaderboard.json', JSON.stringify(leaderboard));
-    res.json({ message: 'Leaderboard updated' });
+    // Hinzufügen der Punktzahl
+    if (action === "add" && name && !isNaN(score)) {
+        leaderboard.push({ name, score });
+        leaderboard = leaderboard.sort((a, b) => b.score - a.score).slice(0, 10); // Sortieren und nur die Top 10 anzeigen
+        return res.json({ success: true, message: 'Punktzahl hinzugefügt!' });
+    }
+
+    // Entfernen eines Spielers
+    if (action === "remove" && name) {
+        leaderboard = leaderboard.filter(entry => entry.name !== name);
+        leaderboard = leaderboard.sort((a, b) => b.score - a.score).slice(0, 10); // Nach dem Entfernen neu sortieren
+        return res.json({ success: true, message: 'Punktzahl entfernt!' });
+    }
+
+    return res.status(400).json({ success: false, message: 'Ungültige Anfrage!' });
 });
 
-// Admin Passwort (zum Schutz)
-const ADMIN_PASSWORD = "admin123";
-
-// Admin-Seite bearbeiten
-app.get('/admin.html', (req, res) => {
-    res.sendFile(__dirname + '/admin.html');
-});
-
+// Start des Servers
 app.listen(port, () => {
-    console.log(`Server is running on https://snakesever.onrender.com:${port}`);
+    console.log(`Server läuft auf http://localhost:${port}`);
 });
