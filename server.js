@@ -1,43 +1,34 @@
 const express = require("express");
-const bodyParser = require("body-parser");
+const cors = require("cors");
+const fs = require("fs");
+
 const app = express();
-const port = 3000;
+const PORT = 3000;
+const DATA_FILE = "leaderboard.json";
 
-app.use(bodyParser.json());
+app.use(express.json());
+app.use(cors());
 
-let leaderboard = [
-    { name: "Player1", score: 100 },
-    { name: "Player2", score: 90 },
-    { name: "Player3", score: 80 },
-    // Top 10 Spieler, maximal 10 Einträge
-];
-
-// Alle Punktzahlen abrufen (Top 10)
+// Bestenliste anzeigen
 app.get("/leaderboard", (req, res) => {
-    res.json(leaderboard.slice(0, 10));  // Nur die Top 10 zurückgeben
+    const data = JSON.parse(fs.readFileSync(DATA_FILE));
+    res.json(data);
 });
 
-// Punktzahl hinzufügen
+// Bestenliste Eintrag hinzufügen
 app.post("/leaderboard", (req, res) => {
     const { name, score } = req.body;
-    if (!name || !score) {
-        return res.status(400).send("Name und Score sind erforderlich");
-    }
-
-    leaderboard.push({ name, score });
-    leaderboard.sort((a, b) => b.score - a.score);  // Sortiere die Bestenliste absteigend
-    leaderboard = leaderboard.slice(0, 10);  // Stelle sicher, dass es nur 10 Einträge gibt
-    res.json({ message: "Punktzahl gespeichert" });
+    let data = JSON.parse(fs.readFileSync(DATA_FILE));
+    data.push({ name, score });
+    data.sort((a, b) => b.score - a.score);
+    fs.writeFileSync(DATA_FILE, JSON.stringify(data.slice(0, 10)));
+    res.sendStatus(200);
 });
 
-// Punktzahl entfernen
+// Bestenliste löschen
 app.delete("/leaderboard", (req, res) => {
-    const { name } = req.body;
-    leaderboard = leaderboard.filter(entry => entry.name !== name);
-    res.json({ message: `Punktzahl für ${name} entfernt` });
+    fs.writeFileSync(DATA_FILE, JSON.stringify([]));
+    res.sendStatus(200);
 });
 
-// Server starten
-app.listen(port, () => {
-    console.log(`Server läuft auf http://localhost:${port}`);
-});
+app.listen(PORT, () => console.log(`Server läuft auf Port ${PORT}`));
