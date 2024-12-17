@@ -1,34 +1,29 @@
-const express = require("express");
-const cors = require("cors");
-const fs = require("fs");
-
+const express = require('express');
 const app = express();
-const PORT = 3000;
-const DATA_FILE = "leaderboard.json";
+const port = process.env.PORT || 3000;
 
-app.use(express.json());
-app.use(cors());
+let leaderboard = [
+    { name: 'Alice', score: 100 },
+    { name: 'Bob', score: 80 },
+    { name: 'Charlie', score: 60 }
+];
 
-// Bestenliste anzeigen
-app.get("/leaderboard", (req, res) => {
-    const data = JSON.parse(fs.readFileSync(DATA_FILE));
-    res.json(data);
+// Setzt den static file route (damit HTML, CSS, JS geladen wird)
+app.use(express.static('public'));
+
+// API zum Abrufen des Leaderboards
+app.get('/leaderboard', (req, res) => {
+    res.json(leaderboard);
 });
 
-// Bestenliste Eintrag hinzufügen
-app.post("/leaderboard", (req, res) => {
-    const { name, score } = req.body;
-    let data = JSON.parse(fs.readFileSync(DATA_FILE));
-    data.push({ name, score });
-    data.sort((a, b) => b.score - a.score);
-    fs.writeFileSync(DATA_FILE, JSON.stringify(data.slice(0, 10)));
-    res.sendStatus(200);
+// API zum Hinzufügen von Scores
+app.post('/submit', express.json(), (req, res) => {
+    leaderboard.push(req.body);
+    leaderboard.sort((a, b) => b.score - a.score);  // sortiert die Liste absteigend
+    leaderboard = leaderboard.slice(0, 10); // nur die besten 10
+    res.status(200).send('Score added');
 });
 
-// Bestenliste löschen
-app.delete("/leaderboard", (req, res) => {
-    fs.writeFileSync(DATA_FILE, JSON.stringify([]));
-    res.sendStatus(200);
+app.listen(port, () => {
+    console.log(`Server läuft auf Port ${port}`);
 });
-
-app.listen(PORT, () => console.log(`Server läuft auf Port ${PORT}`));
