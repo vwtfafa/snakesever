@@ -1,52 +1,116 @@
-const express = require("express");
-const bodyParser = require("body-parser");
-const cors = require("cors");
-const fs = require("fs");
+const express = require('express');
+const bodyParser = require('body-parser');
+const cors = require('cors');
+const fs = require('fs');
 
 const app = express();
-const PORT = 3000;
+const port = 3000; // Du kannst den Port nach Bedarf anpassen
 
+// Middleware
 app.use(cors());
-app.use(bodyParser.json());
+app.use(bodyParser.json()); // Zum Parsen von JSON-Daten
 
-const DATA_FILE = "leaderboard.json";
+// Leaderboard-Daten
+const leaderboardFilePath = './leaderboard.json';
 
-// Lade die Bestenliste
-function loadLeaderboard() {
-    if (!fs.existsSync(DATA_FILE)) return [];
-    const data = fs.readFileSync(DATA_FILE);
-    return JSON.parse(data);
+// Sicherstellen, dass die leaderboard.json-Datei existiert
+if (!fs.existsSync(leaderboardFilePath)) {
+    fs.writeFileSync(leaderboardFilePath, JSON.stringify([]));
 }
 
-// Speichere die Bestenliste
-function saveLeaderboard(leaderboard) {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(leaderboard, null, 2));
-}
-
-// Route: Punktestand einreichen
-app.post("/submit", (req, res) => {
+// Endpunkt zum Einreichen des Scores
+app.post('/submit', (req, res) => {
     const { name, score } = req.body;
 
-    if (!name || score === undefined) {
-        return res.status(400).json({ error: "Ungültige Eingabe" });
+    if (!name || !score) {
+        return res.status(400).send('Name und Score sind erforderlich!');
     }
 
-    const leaderboard = loadLeaderboard();
+    // Bestehende Highscores abrufen
+    const leaderboard = JSON.parse(fs.readFileSync(leaderboardFilePath));
+
+    // Den neuen Score hinzufügen
     leaderboard.push({ name, score });
 
-    // Sortiere und begrenze auf Top 10
+    // Sortieren der Liste und die besten 10 behalten
     leaderboard.sort((a, b) => b.score - a.score);
-    saveLeaderboard(leaderboard.slice(0, 10));
+    if (leaderboard.length > 10) {
+        leaderboard.pop();
+    }
 
-    res.json({ success: true });
+    // Speichern der aktualisierten Bestenliste
+    fs.writeFileSync(leaderboardFilePath, JSON.stringify(leaderboard));
+
+    res.json({ message: 'Score erfolgreich eingereicht!' });
 });
 
-// Route: Bestenliste abrufen
-app.get("/leaderboard", (req, res) => {
-    const leaderboard = loadLeaderboard();
+// Endpunkt zum Abrufen der Bestenliste
+app.get('/leaderboard', (req, res) => {
+    const leaderboard = JSON.parse(fs.readFileSync(leaderboardFilePath));
     res.json(leaderboard);
 });
 
-app.listen(PORT, () => {
-    console.log(`Server läuft auf http://localhost:${PORT}`);
+// Endpunkt für Admin-Login (für Admin-Funktionen)
+const adminCredentials = {
+    username: 'admin',
+    password: 'admin123'
+};
+
+app.post('/admin-login', (req, res) => {
+    const { username, password } = req.body;
+
+    if (username === adminCredentials.username && password === adminCredentials.password) {
+        res.json({ message: 'Login erfolgreich!' });
+    } else {
+        res.status(401).send('Falscher Benutzername oder Passwort.');
+    }
+});
+
+// Admin-Endpunkt zum Löschen eines Eintrags
+app.post('/admin/delete', (req, res) => {
+    const { name } = req.body;
+
+    // Bestehende Leaderboard-Daten abrufen
+    const leaderboard = JSON.parse(fs.readFileSync(leaderboardFilePath));
+
+    // Eintrag finden und löschen
+    const index = leaderboard.findIndex(entry => entry.name === name);
+    if (index !== -1) {
+        leaderboard.splice(index, 1);
+        fs.writeFileSync(leaderboardFilePath, JSON.stringify(leaderboard));
+        res.json({ message: `Eintrag von ${name} gelöscht!` });
+    } else {
+        res.status(404).send('Eintrag nicht gefunden.');
+    }
+});
+
+// Admin-Endpunkt zum Hinzufügen eines Eintrags
+app.post('/admin/add', (req, res) => {
+    const { name, score } = req.body;
+
+    if (!name || !score) {
+        return res.status(400).send('Name und Score sind erforderlich!');
+    }
+
+    // Bestehende Leaderboard-Daten abrufen
+    const leaderboard = JSON.parse(fs.readFileSync(leaderboardFilePath));
+
+    // Eintrag hinzufügen
+    leaderboard.push({ name, score });
+
+    // Sortieren der Liste und die besten 10 behalten
+    leaderboard.sort((a, b) => b.score - a.score);
+    if (leaderboard.length > 10) {
+        leaderboard.pop();
+    }
+
+    // Speichern der aktualisierten Bestenliste
+    fs.writeFileSync(leaderboardFilePath, JSON.stringify(leaderboard));
+
+    res.json({ message: `Eintrag für ${name} hinzugefügt!` });
+});
+
+// Server starten
+app.listen(port, () => {
+    console.log(`Server läuft auf http://localhost:${port}`);
 });
